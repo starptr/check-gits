@@ -29,16 +29,7 @@
             default = devenv.lib.mkShell {
               inherit inputs pkgs;
               modules = [
-                {
-                  # https://devenv.sh/reference/options/
-                  packages = [ pkgs.hello ];
-
-                  enterShell = ''
-                    hello
-                  '';
-
-                  processes.hello.exec = "hello";
-                }
+                (import ./devenv.nix)
               ];
             };
           });
