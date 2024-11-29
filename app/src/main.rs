@@ -320,6 +320,7 @@ fn main() -> Result<()> {
             let synced_remotes = {
                 // Fetch all qualifying remotes
                 let synced_remotes: Vec<_> = qualifying_remotes.iter_mut().filter_map(|remote| {
+                    let remote_name = remote.name().map(|name| name.to_owned());
                     let remote_cb = {
                         let mut remote_cb_builder = git2::RemoteCallbacks::new();
                         remote_cb_builder.credentials(|user, user_from_url, cred| {
@@ -329,7 +330,18 @@ fn main() -> Result<()> {
                                 // TODO: since `cred` is a bitset, figure out if we need to check for other flags
                                 return git2::Cred::username(user);
                             }
-                            git2::Cred::ssh_key(user, None, &ssh_private_key, None)
+                            if cred.is_ssh_key() {
+                                git2::Cred::ssh_key(user, None, &ssh_private_key, None)
+                            } else {
+                                // Unimplemented credential type
+                                // TODO: generalize this along with the "qualifying remote" check above
+                                if let Some(remote_name) = &remote_name {
+                                    if remote_name.starts_with("https://") {
+                                        return Err(git2::Error::from_str(&format!("Unimplemented git2 credential type in remote auth callback: {:?}. Consider changing the remote url to use ssh instead.", cred)));
+                                    }
+                                }
+                                Err(git2::Error::from_str(&format!("Unimplemented git2 credential type in remote auth callback: {:?}", cred)))
+                            }
                         });
                         remote_cb_builder
                     };
