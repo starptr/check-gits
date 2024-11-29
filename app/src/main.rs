@@ -10,6 +10,10 @@ mod cli {
         #[arg(short = 'a', long = "verbose")]
         pub verbose: bool,
 
+        /// Path to the ssh private key to use for authentication. Defaults to ~/.ssh/id_rsa
+        #[arg(short = 'i', long = "ssh-private-key")]
+        pub ssh_private_key: Option<PathBuf>,
+
         /// The directory where the repositories are stored. Defaults to the current working directory.
         pub repos_directory: Option<PathBuf>,
     }
@@ -19,8 +23,8 @@ mod cli {
     }
 }
 
-use anyhow::{Context, Error, Result};
-use std::{fmt::format, fs};
+use anyhow::{Context, Error, Result, ensure};
+use std::{fmt::format, fs, path};
 
 struct Printer {
     verbose: bool,
@@ -220,6 +224,16 @@ fn main() -> Result<()> {
     } else {
         std::env::current_dir().context("Failed to get current directory")?
     };
+    let ssh_private_key = if let Some(ssh_private_key) = args.ssh_private_key {
+        ssh_private_key
+    } else {
+        let home_dir = dirs::home_dir().context("Failed to get home directory")?;
+        home_dir.join(".ssh/id_rsa")
+    };
+    {
+        let ssh_private_key_metadata = fs::metadata(&ssh_private_key).context(format!("Failed to get metadata for ssh private key: {}", ssh_private_key.display()))?;
+        ensure!(ssh_private_key_metadata.is_file(), "The ssh private key path is not a file: {}", ssh_private_key.display());
+    }
 
     for entry in fs::read_dir(&repos_directory)
         .with_context(|| format!("Failed to read projects directory: {}", repos_directory.display()))?
@@ -296,7 +310,7 @@ fn main() -> Result<()> {
                 };
                 // If the url begins with "https://github.com/", then it is a qualifying remote
                 // TODO: support more urls / make them configurable
-                if url.starts_with("https://github.com/") {
+                if url.starts_with("https://github.com/") || url.starts_with("git@github.com:") {
                     qualifying_remotes.push(remote);
                 } else {
                     printer.log_unqualified_remote(&entry, remote_name);
@@ -306,7 +320,23 @@ fn main() -> Result<()> {
             let synced_remotes = {
                 // Fetch all qualifying remotes
                 let synced_remotes: Vec<_> = qualifying_remotes.iter_mut().filter_map(|remote| {
-                    match remote.fetch(&[] as &[&str], None, None) {
+                    let remote_cb = {
+                        let mut remote_cb_builder = git2::RemoteCallbacks::new();
+                        remote_cb_builder.credentials(|user, user_from_url, cred| {
+                            // See https://github.com/rust-lang/git2-rs/issues/329#issuecomment-403318088
+                            let user = user_from_url.unwrap_or(user);
+                            if cred.is_username() {
+                                // TODO: since `cred` is a bitset, figure out if we need to check for other flags
+                                return git2::Cred::username(user);
+                            }
+                            git2::Cred::ssh_key(user, None, &ssh_private_key, None)
+                        });
+                        remote_cb_builder
+                    };
+                    let mut fetch_opts = git2::FetchOptions::new();
+                    fetch_opts.remote_callbacks(remote_cb);
+
+                    match remote.fetch(&[] as &[&str], Some(&mut fetch_opts), None) {
                         Ok(_) => {
                             printer.log_remote_fetch_succeeded(&entry, remote.name().unwrap());
                             Some(remote)
