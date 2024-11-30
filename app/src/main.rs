@@ -24,7 +24,7 @@ mod cli {
 }
 
 use anyhow::{ensure, Context, Error, Result};
-use std::{fmt::format, fs, path};
+use std::{fs};
 
 struct Printer {
     verbose: bool,
@@ -96,12 +96,12 @@ impl Printer {
         self.messages
             .push(Self::msg_general_entry_error_for_entry(entry, error));
     }
-    fn msg_remote_not_found(entry: &fs::DirEntry, remote: &str) -> String {
-        format!("🚨 {}: Remote {} not found", entry.path().display(), remote)
+    fn msg_remote_not_found(entry: &fs::DirEntry, remote: &str, error: Error) -> String {
+        format!("🚨 {}: Remote {} not found: {}", entry.path().display(), remote, error)
     }
-    fn log_remote_not_found(&mut self, entry: &fs::DirEntry, remote_name: &str) {
+    fn log_remote_not_found(&mut self, entry: &fs::DirEntry, remote_name: &str, error: Error) {
         self.messages
-            .push(Self::msg_remote_not_found(entry, remote_name));
+            .push(Self::msg_remote_not_found(entry, remote_name, error));
     }
     fn msg_unqualified_remote(entry: &fs::DirEntry, remote_name: &str) -> String {
         format!(
@@ -499,7 +499,7 @@ fn main() -> Result<()> {
                 let remote = match repo.find_remote(&remote_name) {
                     Ok(remote) => remote,
                     Err(error) => {
-                        printer.log_remote_not_found(&entry, remote_name);
+                        printer.log_remote_not_found(&entry, remote_name, error.into());
                         continue;
                     }
                 };
