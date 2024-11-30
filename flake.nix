@@ -4,6 +4,7 @@
     systems.url = "github:nix-systems/default";
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
+    flake-compat.url = "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz";
   };
 
   nixConfig = {
@@ -53,7 +54,7 @@
       overlays = {
         ${pname} = final: prev: {
           ${pname} = self.packages.${final.stdenv.hostPlatform.system}.${pname};
-        }
+        };
         default = self.overlays.${pname};
       };
 
