@@ -23,7 +23,7 @@ mod cli {
     }
 }
 
-use anyhow::{Context, Error, Result, ensure};
+use anyhow::{ensure, Context, Error, Result};
 use std::{fmt::format, fs, path};
 
 struct Printer {
@@ -41,7 +41,10 @@ impl Printer {
         self.messages.clear();
     }
     fn new(verbose: bool) -> Self {
-        Self { verbose, messages: Vec::new() }
+        Self {
+            verbose,
+            messages: Vec::new(),
+        }
     }
     fn msg_symlink(path: &std::path::Path) -> String {
         format!("⚠️ Found symlink: {}. Ignoring this entry, as at the time of making this tool, I have never made symlinks in there, so I don't know what it means semantically.", path.display())
@@ -56,16 +59,25 @@ impl Printer {
         self.messages.push(Self::msg_file(path));
     }
     fn msg_nongit_dir(path: &std::path::Path, msg: &str) -> String {
-        format!("❗ {}: {}. This is not a git repository.", msg, path.display())
+        format!(
+            "❗ {}: {}. This is not a git repository.",
+            msg,
+            path.display()
+        )
     }
     fn log_nongit_dir(&mut self, path: &std::path::Path, msg: &str) {
         self.messages.push(Self::msg_nongit_dir(path, msg));
     }
     fn msg_local_only_branch(entry: &fs::DirEntry, local_branch: git2::Branch) -> String {
-        format!("💥 {}: Local branch {} has no upstream (tracking remote branch)", entry.path().display(), local_branch.name().unwrap().unwrap())
+        format!(
+            "💥 {}: Local branch {} has no upstream (tracking remote branch)",
+            entry.path().display(),
+            local_branch.name().unwrap().unwrap()
+        )
     }
     fn log_local_only_branch(&mut self, entry: &fs::DirEntry, local_branch: git2::Branch) {
-        self.messages.push(Self::msg_local_only_branch(entry, local_branch));
+        self.messages
+            .push(Self::msg_local_only_branch(entry, local_branch));
     }
     fn msg_general_entry_error(error: Error) -> String {
         format!("🚨 {}: {}", UNEXPECTED_GENERAL_ENTRY_ERROR, error)
@@ -74,136 +86,312 @@ impl Printer {
         self.messages.push(Self::msg_general_entry_error(error));
     }
     fn msg_general_entry_error_for_entry(entry: &fs::DirEntry, error: Error) -> String {
-        format!("🚨 Failed for the entry {}: {}", entry.path().display(), error)
+        format!(
+            "🚨 Failed for the entry {}: {}",
+            entry.path().display(),
+            error
+        )
     }
     fn log_general_entry_error_for_entry(&mut self, entry: &fs::DirEntry, error: Error) {
-        self.messages.push(Self::msg_general_entry_error_for_entry(entry, error));
+        self.messages
+            .push(Self::msg_general_entry_error_for_entry(entry, error));
     }
     fn msg_remote_not_found(entry: &fs::DirEntry, remote: &str) -> String {
         format!("🚨 {}: Remote {} not found", entry.path().display(), remote)
     }
     fn log_remote_not_found(&mut self, entry: &fs::DirEntry, remote_name: &str) {
-        self.messages.push(Self::msg_remote_not_found(entry, remote_name));
+        self.messages
+            .push(Self::msg_remote_not_found(entry, remote_name));
     }
     fn msg_unqualified_remote(entry: &fs::DirEntry, remote_name: &str) -> String {
-        format!("⚠️ {}: Remote {} is not a qualifying remote", entry.path().display(), remote_name)
+        format!(
+            "⚠️ {}: Remote {} is not a qualifying remote",
+            entry.path().display(),
+            remote_name
+        )
     }
     fn log_unqualified_remote(&mut self, entry: &fs::DirEntry, remote_name: &str) {
-        self.messages.push(Self::msg_unqualified_remote(entry, remote_name));
+        self.messages
+            .push(Self::msg_unqualified_remote(entry, remote_name));
     }
-    fn msg_remote_fetch_failed(entry: &fs::DirEntry, remote_name: &str, error: git2::Error) -> String {
-        format!("🚨 {}: Failed to fetch remote {}: {}", entry.path().display(), remote_name, error)
+    fn msg_remote_fetch_failed(
+        entry: &fs::DirEntry,
+        remote_name: &str,
+        error: git2::Error,
+    ) -> String {
+        format!(
+            "🚨 {}: Failed to fetch remote {}: {}",
+            entry.path().display(),
+            remote_name,
+            error
+        )
     }
-    fn log_remote_fetch_failed(&mut self, entry: &fs::DirEntry, remote_name: &str, error: git2::Error) {
-        self.messages.push(Self::msg_remote_fetch_failed(entry, remote_name, error));
+    fn log_remote_fetch_failed(
+        &mut self,
+        entry: &fs::DirEntry,
+        remote_name: &str,
+        error: git2::Error,
+    ) {
+        self.messages
+            .push(Self::msg_remote_fetch_failed(entry, remote_name, error));
     }
     fn msg_remote_bad_name(entry: &fs::DirEntry, remote_name_bytes: &[u8]) -> String {
-        format!("🚨 {}: Remote {} skipped due to invalid utf8", entry.path().display(), String::from_utf8_lossy(remote_name_bytes))
+        format!(
+            "🚨 {}: Remote {} skipped due to invalid utf8",
+            entry.path().display(),
+            String::from_utf8_lossy(remote_name_bytes)
+        )
     }
     fn log_remote_bad_name(&mut self, entry: &fs::DirEntry, remote_name_bytes: &[u8]) {
-        self.messages.push(Self::msg_remote_bad_name(entry, remote_name_bytes));
+        self.messages
+            .push(Self::msg_remote_bad_name(entry, remote_name_bytes));
     }
     fn msg_remote_no_name(entry: &fs::DirEntry) -> String {
-        format!("🚨 {}: A remote was skipped because it was not named", entry.path().display())
+        format!(
+            "🚨 {}: A remote was skipped because it was not named",
+            entry.path().display()
+        )
     }
     fn log_remote_no_name(&mut self, entry: &fs::DirEntry) {
         self.messages.push(Self::msg_remote_no_name(entry));
     }
     fn msg_remote_bad_url(entry: &fs::DirEntry, remote_name: &str, url: &[u8]) -> String {
-        format!("🚨 {}: Remote {} has a bad url: {}", entry.path().display(), remote_name, String::from_utf8_lossy(url))
+        format!(
+            "🚨 {}: Remote {} has a bad url: {}",
+            entry.path().display(),
+            remote_name,
+            String::from_utf8_lossy(url)
+        )
     }
     fn log_remote_bad_url(&mut self, entry: &fs::DirEntry, remote_name: &str, url: &[u8]) {
-        self.messages.push(Self::msg_remote_bad_url(entry, remote_name, url));
+        self.messages
+            .push(Self::msg_remote_bad_url(entry, remote_name, url));
     }
     fn msg_branch_name_error(entry: &fs::DirEntry, error: Error) -> String {
-        format!("🚨 {}: Failed to get the name of a branch: {}", entry.path().display(), error)
+        format!(
+            "🚨 {}: Failed to get the name of a branch: {}",
+            entry.path().display(),
+            error
+        )
     }
     fn log_branch_name_error(&mut self, entry: &fs::DirEntry, error: Error) {
-        self.messages.push(Self::msg_branch_name_error(entry, error));
+        self.messages
+            .push(Self::msg_branch_name_error(entry, error));
     }
-    fn msg_local_branch_has_no_remote_tracking_branch(entry: &fs::DirEntry, branch_name: &str, error: Error) -> String {
-        format!("💥 {}: Local branch {} has no remote tracking branch: {}", entry.path().display(), branch_name, error)
+    fn msg_local_branch_has_no_remote_tracking_branch(
+        entry: &fs::DirEntry,
+        branch_name: &str,
+        error: Error,
+    ) -> String {
+        format!(
+            "💥 {}: Local branch {} has no remote tracking branch: {}",
+            entry.path().display(),
+            branch_name,
+            error
+        )
     }
-    fn log_local_branch_has_no_remote_tracking_branch(&mut self, entry: &fs::DirEntry, branch_name: &str, error: Error) {
-        self.messages.push(Self::msg_local_branch_has_no_remote_tracking_branch(entry, branch_name, error));
+    fn log_local_branch_has_no_remote_tracking_branch(
+        &mut self,
+        entry: &fs::DirEntry,
+        branch_name: &str,
+        error: Error,
+    ) {
+        self.messages
+            .push(Self::msg_local_branch_has_no_remote_tracking_branch(
+                entry,
+                branch_name,
+                error,
+            ));
     }
     fn msg_branch_bad_name(entry: &fs::DirEntry, branch_name_bytes: &[u8]) -> String {
-        format!("🚨 {}: Branch {} has invalid utf8", entry.path().display(), String::from_utf8_lossy(branch_name_bytes))
+        format!(
+            "🚨 {}: Branch {} has invalid utf8",
+            entry.path().display(),
+            String::from_utf8_lossy(branch_name_bytes)
+        )
     }
     fn log_branch_bad_name(&mut self, entry: &fs::DirEntry, branch_name_bytes: &[u8]) {
-        self.messages.push(Self::msg_branch_bad_name(entry, branch_name_bytes));
+        self.messages
+            .push(Self::msg_branch_bad_name(entry, branch_name_bytes));
     }
     fn msg_general_branch_error(entry: &fs::DirEntry, branch_name: &str, error: Error) -> String {
-        format!("🚨 {}: An operation on branch {} failed: {}", entry.path().display(), branch_name, error)
+        format!(
+            "🚨 {}: An operation on branch {} failed: {}",
+            entry.path().display(),
+            branch_name,
+            error
+        )
     }
     fn log_general_branch_error(&mut self, entry: &fs::DirEntry, branch_name: &str, error: Error) {
-        self.messages.push(Self::msg_general_branch_error(entry, branch_name, error));
+        self.messages
+            .push(Self::msg_general_branch_error(entry, branch_name, error));
     }
     fn msg_local_branch_ahead_of_upstream(entry: &fs::DirEntry, branch_name: &str) -> String {
-        format!("🚨 {}: Local branch {} is ahead of the upstream", entry.path().display(), branch_name)
+        format!(
+            "🚨 {}: Local branch {} is ahead of the upstream",
+            entry.path().display(),
+            branch_name
+        )
     }
     fn log_local_branch_ahead_of_upstream(&mut self, entry: &fs::DirEntry, branch_name: &str) {
-        self.messages.push(Self::msg_local_branch_ahead_of_upstream(entry, branch_name));
+        self.messages
+            .push(Self::msg_local_branch_ahead_of_upstream(entry, branch_name));
     }
-    fn msg_local_branch_not_found_in_remote_ancestor(entry: &fs::DirEntry, branch_name: &str) -> String {
-        format!("🚨 {}: Local branch {} is not in the ancestor of the upstream", entry.path().display(), branch_name)
+    fn msg_local_branch_not_found_in_remote_ancestor(
+        entry: &fs::DirEntry,
+        branch_name: &str,
+    ) -> String {
+        format!(
+            "🚨 {}: Local branch {} is not in the ancestor of the upstream",
+            entry.path().display(),
+            branch_name
+        )
     }
-    fn log_local_branch_not_found_in_remote_ancestor(&mut self, entry: &fs::DirEntry, branch_name: &str) {
-        self.messages.push(Self::msg_local_branch_not_found_in_remote_ancestor(entry, branch_name));
+    fn log_local_branch_not_found_in_remote_ancestor(
+        &mut self,
+        entry: &fs::DirEntry,
+        branch_name: &str,
+    ) {
+        self.messages
+            .push(Self::msg_local_branch_not_found_in_remote_ancestor(
+                entry,
+                branch_name,
+            ));
     }
     fn msg_branch_is_synced(entry: &fs::DirEntry, branch_name: &str) -> String {
-        format!("✅ {}: Local branch {} is synced with the remote", entry.path().display(), branch_name)
+        format!(
+            "✅ {}: Local branch {} is synced with the remote",
+            entry.path().display(),
+            branch_name
+        )
     }
     fn log_branch_is_synced(&mut self, entry: &fs::DirEntry, branch_name: &str) {
-        self.messages.push(Self::msg_branch_is_synced(entry, branch_name));
+        self.messages
+            .push(Self::msg_branch_is_synced(entry, branch_name));
     }
     fn msg_entry(entry: &fs::DirEntry) -> String {
         format!("📝 Looking at the entry {}", entry.path().display())
     }
     fn log_entry(&mut self, entry: &fs::DirEntry) {
-        if !self.verbose { return; }
+        if !self.verbose {
+            return;
+        }
         self.messages.push(Self::msg_entry(entry));
     }
     fn msg_entry_is_a_git_repo(entry: &fs::DirEntry) -> String {
         format!("📝 {}: This is a git repo ✔︎", entry.path().display())
     }
     fn log_entry_is_a_git_repo(&mut self, entry: &fs::DirEntry) {
-        if !self.verbose { return; }
+        if !self.verbose {
+            return;
+        }
         self.messages.push(Self::msg_entry_is_a_git_repo(entry));
     }
     fn msg_remote_fetch_succeeded(entry: &fs::DirEntry, remote_name: &str) -> String {
-        format!("📝 {}: Synced remote {}", entry.path().display(), remote_name)
+        format!(
+            "📝 {}: Synced remote {}",
+            entry.path().display(),
+            remote_name
+        )
     }
     fn log_remote_fetch_succeeded(&mut self, entry: &fs::DirEntry, remote_name: &str) {
-        if !self.verbose { return; }
-        self.messages.push(Self::msg_remote_fetch_succeeded(entry, remote_name));
+        if !self.verbose {
+            return;
+        }
+        self.messages
+            .push(Self::msg_remote_fetch_succeeded(entry, remote_name));
     }
     fn msg_branch_name(entry: &fs::DirEntry, branch_name: &str) -> String {
-        format!("📝 {}: Looking at branch {}", entry.path().display(), branch_name)
+        format!(
+            "📝 {}: Looking at branch {}",
+            entry.path().display(),
+            branch_name
+        )
     }
     fn log_branch_name(&mut self, entry: &fs::DirEntry, branch_name: &str) {
-        if !self.verbose { return; }
-        self.messages.push(Self::msg_branch_name(entry, branch_name));
+        if !self.verbose {
+            return;
+        }
+        self.messages
+            .push(Self::msg_branch_name(entry, branch_name));
     }
-    fn msg_branch_upstream_name(entry: &fs::DirEntry, branch_name: &str, upstream_name: &str) -> String {
-        format!("📝 {}: Branch {} has upstream {}", entry.path().display(), branch_name, upstream_name)
+    fn msg_branch_upstream_name(
+        entry: &fs::DirEntry,
+        branch_name: &str,
+        upstream_name: &str,
+    ) -> String {
+        format!(
+            "📝 {}: Branch {} has upstream {}",
+            entry.path().display(),
+            branch_name,
+            upstream_name
+        )
     }
-    fn log_branch_upstream_name(&mut self, entry: &fs::DirEntry, branch_name: &str, upstream_name: &str) {
-        if !self.verbose { return; }
-        self.messages.push(Self::msg_branch_upstream_name(entry, branch_name, upstream_name));
+    fn log_branch_upstream_name(
+        &mut self,
+        entry: &fs::DirEntry,
+        branch_name: &str,
+        upstream_name: &str,
+    ) {
+        if !self.verbose {
+            return;
+        }
+        self.messages.push(Self::msg_branch_upstream_name(
+            entry,
+            branch_name,
+            upstream_name,
+        ));
     }
-    fn msg_branch_upstream_remote_name(entry: &fs::DirEntry, branch_name: &str, remote_name: &str) -> String {
-        format!("📝 {}: Branch {} has upstream remote {}", entry.path().display(), branch_name, remote_name)
+    fn msg_branch_upstream_remote_name(
+        entry: &fs::DirEntry,
+        branch_name: &str,
+        remote_name: &str,
+    ) -> String {
+        format!(
+            "📝 {}: Branch {} has upstream remote {}",
+            entry.path().display(),
+            branch_name,
+            remote_name
+        )
     }
-    fn log_branch_upstream_remote_name(&mut self, entry: &fs::DirEntry, branch_name: &str, remote_name: &str) {
-        if !self.verbose { return; }
-        self.messages.push(Self::msg_branch_upstream_remote_name(entry, branch_name, remote_name));
+    fn log_branch_upstream_remote_name(
+        &mut self,
+        entry: &fs::DirEntry,
+        branch_name: &str,
+        remote_name: &str,
+    ) {
+        if !self.verbose {
+            return;
+        }
+        self.messages.push(Self::msg_branch_upstream_remote_name(
+            entry,
+            branch_name,
+            remote_name,
+        ));
     }
-    fn msg_branch_remote_not_fetched(entry: &fs::DirEntry, branch_name: &str, remote_name: &str) -> String {
-        format!("🚨 {}: Branch {} has non-fetched remote {}", entry.path().display(), branch_name, remote_name)
+    fn msg_branch_remote_not_fetched(
+        entry: &fs::DirEntry,
+        branch_name: &str,
+        remote_name: &str,
+    ) -> String {
+        format!(
+            "🚨 {}: Branch {} has non-fetched remote {}",
+            entry.path().display(),
+            branch_name,
+            remote_name
+        )
     }
-    fn log_branch_remote_not_fetched(&mut self, entry: &fs::DirEntry, branch_name: &str, remote_name: &str) {
-        self.messages.push(Self::msg_branch_remote_not_fetched(entry, branch_name, remote_name));
+    fn log_branch_remote_not_fetched(
+        &mut self,
+        entry: &fs::DirEntry,
+        branch_name: &str,
+        remote_name: &str,
+    ) {
+        self.messages.push(Self::msg_branch_remote_not_fetched(
+            entry,
+            branch_name,
+            remote_name,
+        ));
     }
     fn simple_log(&mut self, message: &str) {
         self.messages.push(message.to_string());
@@ -233,13 +421,23 @@ fn main() -> Result<()> {
         home_dir.join(".ssh/id_rsa")
     };
     {
-        let ssh_private_key_metadata = fs::metadata(&ssh_private_key).context(format!("Failed to get metadata for ssh private key: {}", ssh_private_key.display()))?;
-        ensure!(ssh_private_key_metadata.is_file(), "The ssh private key path is not a file: {}", ssh_private_key.display());
+        let ssh_private_key_metadata = fs::metadata(&ssh_private_key).context(format!(
+            "Failed to get metadata for ssh private key: {}",
+            ssh_private_key.display()
+        ))?;
+        ensure!(
+            ssh_private_key_metadata.is_file(),
+            "The ssh private key path is not a file: {}",
+            ssh_private_key.display()
+        );
     }
 
-    for entry in fs::read_dir(&repos_directory)
-        .with_context(|| format!("Failed to read projects directory: {}", repos_directory.display()))?
-    {
+    for entry in fs::read_dir(&repos_directory).with_context(|| {
+        format!(
+            "Failed to read projects directory: {}",
+            repos_directory.display()
+        )
+    })? {
         let mut printer = Printer::new(args.verbose);
 
         let entry = match entry {
@@ -247,7 +445,7 @@ fn main() -> Result<()> {
             Err(error) => {
                 printer.log_general_entry_error(error.into());
                 continue;
-            },
+            }
         };
 
         printer.log_entry(&entry);
@@ -272,13 +470,13 @@ fn main() -> Result<()> {
             }
 
             // Current entry is a directory
-            use git2::{Repository, Remote};
+            use git2::{Remote, Repository};
             let repo = match Repository::open(&path) {
                 Ok(repo) => repo,
                 Err(error) => {
                     printer.log_nongit_dir(&path, error.message());
-                    return Ok(())
-                },
+                    return Ok(());
+                }
             };
             // Current entry is a git repository
             printer.log_entry_is_a_git_repo(&entry);
@@ -288,27 +486,29 @@ fn main() -> Result<()> {
             // Find all remotes
             let remote_names = repo.remotes()?;
             let mut qualifying_remotes: Vec<Remote> = Vec::new();
-            for (remote_name, remote_name_bytes) in std::iter::zip(remote_names.iter(), remote_names.iter_bytes()) {
+            for (remote_name, remote_name_bytes) in
+                std::iter::zip(remote_names.iter(), remote_names.iter_bytes())
+            {
                 let remote_name = match remote_name {
                     Some(remote) => remote,
                     None => {
                         printer.log_remote_bad_name(&entry, remote_name_bytes);
                         continue;
-                    },
+                    }
                 };
                 let remote = match repo.find_remote(&remote_name) {
                     Ok(remote) => remote,
                     Err(error) => {
                         printer.log_remote_not_found(&entry, remote_name);
                         continue;
-                    },
+                    }
                 };
                 let url = match remote.url() {
                     Some(url) => url,
                     None => {
                         printer.log_remote_bad_url(&entry, remote_name, remote.url_bytes());
                         continue;
-                    },
+                    }
                 };
                 // If the url begins with "https://github.com/", then it is a qualifying remote
                 // TODO: support more urls / make them configurable
@@ -318,7 +518,7 @@ fn main() -> Result<()> {
                     printer.log_unqualified_remote(&entry, remote_name);
                 }
             }
-            
+
             let synced_remotes = {
                 // Fetch all qualifying remotes
                 let synced_remotes: Vec<_> = qualifying_remotes.iter_mut().filter_map(|remote| {
@@ -372,17 +572,20 @@ fn main() -> Result<()> {
                 let (branch, _) = branch?;
                 // Convert a Result<Option<&str, Error> to a Result<String, Error>
                 let branch_name = branch.name().and_then(|maybe_branch_name| {
-                    maybe_branch_name.map_or_else(|| {
-                        branch.name_bytes().map(|slice| String::from_utf8_lossy(slice).to_string())
-                    }, |branch_name| {
-                        Ok(branch_name.to_owned())
-                    })
+                    maybe_branch_name.map_or_else(
+                        || {
+                            branch
+                                .name_bytes()
+                                .map(|slice| String::from_utf8_lossy(slice).to_string())
+                        },
+                        |branch_name| Ok(branch_name.to_owned()),
+                    )
                 });
                 let branch_name = match branch_name {
                     Ok(branch_name) => {
                         printer.log_branch_name(&entry, &branch_name);
                         branch_name
-                    },
+                    }
                     Err(error) => {
                         printer.log_branch_name_error(&entry, error.into());
                         continue;
@@ -391,21 +594,32 @@ fn main() -> Result<()> {
                 let remote_tracking_branch = match branch.upstream() {
                     Ok(remote_tracking_branch) => remote_tracking_branch,
                     Err(error) => {
-                        printer.log_local_branch_has_no_remote_tracking_branch(&entry, &branch_name, error.into());
+                        printer.log_local_branch_has_no_remote_tracking_branch(
+                            &entry,
+                            &branch_name,
+                            error.into(),
+                        );
                         continue;
                     }
                 };
-                
+
                 // Check upstream tracks a synced remote
                 let remote_tracking_branch_fqrefname = match remote_tracking_branch.name() {
                     Ok(Some(remote_tracking_branch_name)) => {
-                        printer.log_branch_upstream_name(&entry, &branch_name, remote_tracking_branch_name);
+                        printer.log_branch_upstream_name(
+                            &entry,
+                            &branch_name,
+                            remote_tracking_branch_name,
+                        );
                         // The `repo.branch_remote_name` function expects a fully qualified refname
                         format!("refs/remotes/{}", remote_tracking_branch_name)
-                    },
+                    }
                     Ok(None) => {
                         // TODO: refactor to handle Err from name_bytes()
-                        printer.log_branch_bad_name(&entry, remote_tracking_branch.name_bytes().unwrap());
+                        printer.log_branch_bad_name(
+                            &entry,
+                            remote_tracking_branch.name_bytes().unwrap(),
+                        );
                         continue;
                     }
                     Err(error) => {
@@ -416,22 +630,30 @@ fn main() -> Result<()> {
                 let remote_name = match repo.branch_remote_name(&remote_tracking_branch_fqrefname) {
                     Ok(buf) => match buf.as_str() {
                         Some(remote_name) => {
-                            printer.log_branch_upstream_remote_name(&entry, &branch_name, remote_name);
+                            printer.log_branch_upstream_remote_name(
+                                &entry,
+                                &branch_name,
+                                remote_name,
+                            );
                             remote_name.to_owned()
-                        },
+                        }
                         None => {
                             printer.log_remote_bad_name(&entry, &[]);
                             continue;
-                        },
+                        }
                     },
                     Err(error) => {
-                        printer.log_general_branch_error(&entry, &remote_tracking_branch_fqrefname, error.into());
+                        printer.log_general_branch_error(
+                            &entry,
+                            &remote_tracking_branch_fqrefname,
+                            error.into(),
+                        );
                         continue;
-                    },
+                    }
                 };
-                let has_synced_remote = synced_remotes.iter().any(|remote| {
-                    remote.name().unwrap() == remote_name
-                });
+                let has_synced_remote = synced_remotes
+                    .iter()
+                    .any(|remote| remote.name().unwrap() == remote_name);
                 if !has_synced_remote {
                     printer.log_branch_remote_not_fetched(&entry, &branch_name, &remote_name);
                     continue;
@@ -458,13 +680,11 @@ fn main() -> Result<()> {
                 let mut revwalk = repo.revwalk()?;
                 revwalk.set_sorting(git2::Sort::TOPOLOGICAL)?;
                 revwalk.push(upstream_oid)?;
-                let local_oid_is_ancestor_of_upstream = revwalk.any(|oid| {
-                    match oid {
-                        Ok(oid) => oid == branch_oid,
-                        Err(error) => {
-                            printer.log_general_branch_error(&entry, &branch_name, error.into());
-                            false
-                        }
+                let local_oid_is_ancestor_of_upstream = revwalk.any(|oid| match oid {
+                    Ok(oid) => oid == branch_oid,
+                    Err(error) => {
+                        printer.log_general_branch_error(&entry, &branch_name, error.into());
+                        false
                     }
                 });
                 if !local_oid_is_ancestor_of_upstream {
@@ -472,13 +692,11 @@ fn main() -> Result<()> {
                     let mut revwalk = repo.revwalk()?;
                     revwalk.set_sorting(git2::Sort::TOPOLOGICAL)?;
                     revwalk.push(branch_oid)?;
-                    let upstream_oid_is_ancestor_of_local = revwalk.any(|oid| {
-                        match oid {
-                            Ok(oid) => oid == upstream_oid,
-                            Err(error) => {
-                                printer.log_general_branch_error(&entry, &branch_name, error.into());
-                                false
-                            }
+                    let upstream_oid_is_ancestor_of_local = revwalk.any(|oid| match oid {
+                        Ok(oid) => oid == upstream_oid,
+                        Err(error) => {
+                            printer.log_general_branch_error(&entry, &branch_name, error.into());
+                            false
                         }
                     });
                     if upstream_oid_is_ancestor_of_local {
