@@ -21,18 +21,19 @@
     }@inputs:
     let
       forEachSystem = nixpkgs.lib.genAttrs (import systems);
+      metadata = builtins.fromTOML (builtins.readFile ./app/Cargo.toml);
+      pname = metadata.package.name;
     in
     {
       packages = forEachSystem (
         system:
         let
           pkgs = import nixpkgs { inherit system; };
-          metadata = builtins.fromTOML (builtins.readFile ./app/Cargo.toml);
         in
         {
           devenv-up = self.devShells.${system}.default.config.procfileScript;
-          ${metadata.package.name} = pkgs.rustPlatform.buildRustPackage {
-            name = metadata.package.name;
+          ${pname} = pkgs.rustPlatform.buildRustPackage {
+            name = pname;
             version = metadata.package.version;
             src = ./app;
             buildInputs =
@@ -45,9 +46,16 @@
               lockFile = ./app/Cargo.lock;
             };
           };
-          default = self.packages.${system}.${metadata.package.name};
+          default = self.packages.${system}.${pname};
         }
       );
+
+      overlays = {
+        ${pname} = final: prev: {
+          ${pname} = self.packages.${final.stdenv.hostPlatform.system}.${pname};
+        }
+        default = self.overlays.${pname};
+      };
 
       devShells = forEachSystem (
         system:
