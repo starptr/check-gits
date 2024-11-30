@@ -23,27 +23,31 @@
       forEachSystem = nixpkgs.lib.genAttrs (import systems);
     in
     {
-      packages = forEachSystem (system: 
+      packages = forEachSystem (
+        system:
         let
           pkgs = import nixpkgs { inherit system; };
           metadata = builtins.fromTOML (builtins.readFile ./app/Cargo.toml);
         in
         {
-        devenv-up = self.devShells.${system}.default.config.procfileScript;
-        ${metadata.package.name} = pkgs.rustPlatform.buildRustPackage {
-          name = metadata.package.name;
-          version = metadata.package.version;
-          src = ./app;
-          buildInputs = [] ++ nixpkgs.lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.openssl # TODO: check if this is needed for non-darwin targets
-            pkgs.darwin.apple_sdk.frameworks.Security
-          ];
-          cargoLock = {
-            lockFile = ./app/Cargo.lock;
+          devenv-up = self.devShells.${system}.default.config.procfileScript;
+          ${metadata.package.name} = pkgs.rustPlatform.buildRustPackage {
+            name = metadata.package.name;
+            version = metadata.package.version;
+            src = ./app;
+            buildInputs =
+              [ ]
+              ++ nixpkgs.lib.optionals pkgs.stdenv.isDarwin [
+                pkgs.openssl # TODO: check if this is needed for non-darwin targets
+                pkgs.darwin.apple_sdk.frameworks.Security
+              ];
+            cargoLock = {
+              lockFile = ./app/Cargo.lock;
+            };
           };
-        };
-        default = self.packages.${system}.${metadata.package.name};
-      });
+          default = self.packages.${system}.${metadata.package.name};
+        }
+      );
 
       devShells = forEachSystem (
         system:
