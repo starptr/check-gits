@@ -218,7 +218,9 @@ impl Drop for Printer {
 
 fn main() -> Result<()> {
     let args = cli::get_args();
-    println!("{:?}", args);
+    if args.verbose {
+        println!("{:?}", args);
+    }
     let repos_directory = if let Some(repos_directory) = args.repos_directory {
         repos_directory
     } else {
