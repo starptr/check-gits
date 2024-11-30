@@ -1,5 +1,5 @@
 [package]
-name = "git-unite"
+name = "check-gits"
 version = "0.1.1"
 edition = "2021"
 
