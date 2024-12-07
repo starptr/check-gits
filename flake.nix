@@ -5,6 +5,7 @@
     devenv.url = "github:cachix/devenv";
     devenv.inputs.nixpkgs.follows = "nixpkgs";
     flake-compat.url = "https://flakehub.com/f/edolstra/flake-compat/1.tar.gz";
+    cardboard.url = "github:starptr/cardboard";
   };
 
   nixConfig = {
@@ -18,6 +19,7 @@
       nixpkgs,
       devenv,
       systems,
+      cardboard,
       ...
     }@inputs:
     let
@@ -33,8 +35,8 @@
         in
         {
           devenv-up = self.devShells.${system}.default.config.procfileScript;
-          ${pname} = pkgs.rustPlatform.buildRustPackage {
-            name = pname;
+          ${pname} = cardboard.lib.keepFnInput pkgs.rustPlatform.buildRustPackage {
+            inherit pname;
             version = metadata.package.version;
             src = ./app;
             buildInputs =

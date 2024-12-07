@@ -66,6 +66,21 @@
         "type": "github"
       }
     },
+    "cardboard": {
+      "locked": {
+        "lastModified": 1733553805,
+        "narHash": "sha256-KVqwZvx5kKrUAqaxtk/TgKbS7Su31w9l2pBgwYpx6Nc=",
+        "owner": "starptr",
+        "repo": "cardboard",
+        "rev": "5ba1798960438a76d9c83e16a78c34e5f931c562",
+        "type": "github"
+      },
+      "original": {
+        "owner": "starptr",
+        "repo": "cardboard",
+        "type": "github"
+      }
+    },
     "devenv": {
       "inputs": {
         "cachix": "cachix",
@@ -631,6 +646,7 @@
     },
     "root": {
       "inputs": {
+        "cardboard": "cardboard",
         "devenv": "devenv",
         "flake-compat": "flake-compat_3",
         "nixpkgs": "nixpkgs_3",
