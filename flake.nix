@@ -26,6 +26,7 @@
       forEachSystem = nixpkgs.lib.genAttrs (import systems);
       metadata = builtins.fromTOML (builtins.readFile ./app/Cargo.toml);
       pname = metadata.package.name;
+      version = metadata.package.version;
     in
     {
       packages = forEachSystem (
@@ -36,8 +37,7 @@
         {
           devenv-up = self.devShells.${system}.default.config.procfileScript;
           ${pname} = cardboard.lib.keepFnInput pkgs.rustPlatform.buildRustPackage {
-            inherit pname;
-            version = metadata.package.version;
+            inherit pname version;
             src = ./app;
             buildInputs =
               [ ]
